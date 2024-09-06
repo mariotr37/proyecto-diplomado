@@ -9,6 +9,14 @@ import 'dart:html' as html;
 
 import 'package:taller_1_diplomado/login_page.dart';
 
+final _formKey = GlobalKey<FormState>();
+final TextEditingController _nameController = TextEditingController();
+final TextEditingController _phoneController = TextEditingController();
+final TextEditingController _emailController = TextEditingController();
+final TextEditingController _passwordController = TextEditingController();
+final TextEditingController _confirmPasswordController =
+    TextEditingController();
+
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -17,15 +25,17 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  //Generación de llaves
-
   Future<void> _sendData() async {
-    const name = 'test';
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:5000/guardar_usuario'),
+        Uri.parse('http://localhost:5000/register'),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"name": name}),
+        body: jsonEncode({
+          "nombre": _nameController.text,
+          "telefono": _phoneController.text,
+          "email": _emailController.text,
+          "password": _passwordController.text
+        }),
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -72,14 +82,6 @@ class _RegisterPageState extends State<RegisterPage> {
       ..click();
     html.Url.revokeObjectUrl(url);
   }
-
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {

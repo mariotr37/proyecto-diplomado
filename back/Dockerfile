@@ -21,4 +21,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 5000
 
 # Definir el comando para correr la aplicación
-CMD ["python", "main.py"]
+CMD ["python", "Main.py"]

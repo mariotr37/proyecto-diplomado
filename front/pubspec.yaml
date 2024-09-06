@@ -36,6 +36,7 @@ dependencies:
   http: ^1.2.2
   pointycastle: ^3.9.1
   rsa_encrypt: ^2.0.0
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   build_runner: ^2.4.0

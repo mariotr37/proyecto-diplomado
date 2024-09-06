@@ -1,6 +1,9 @@
-import mysql.connector
 import os
+from datetime import datetime
+
+import mysql.connector
 from dotenv import load_dotenv
+
 
 class BaseDeDatos:
     def __init__(self):
@@ -24,6 +27,7 @@ class BaseDeDatos:
                     user=self.user,
                     password=self.password,
                     database=self.database,
+                    port=3306,
                     charset='utf8mb4',
                     collation='utf8mb4_general_ci'
                 )
@@ -45,15 +49,15 @@ class BaseDeDatos:
             self.conn = None
             print("Conexión a la base de datos cerrada.")
 
-    def guardar_usuario(self, nombre, public_key):
+    def guardar_usuario(self, nombre, telefono, email, password, public_key):
         """Guarda un usuario en la tabla 'usuario' con su nombre y public key."""
         try:
             conn = self.obtener_conexion()
             cursor = conn.cursor()
 
             # Inserta el usuario en la tabla 'usuario'
-            sql = "INSERT INTO Usuarios (Name, PublicKey) VALUES (%s, %s)"
-            cursor.execute(sql, (nombre, public_key))
+            sql = "INSERT INTO Usuario (Name, PublicKey, Telefono, Email, Password) VALUES (%s, %s, %s, %s, %s)"
+            cursor.execute(sql, (nombre, public_key, telefono, email, password))
 
             # Confirma la transacción
             conn.commit()
@@ -62,8 +66,116 @@ class BaseDeDatos:
 
         except mysql.connector.Error as e:
             return f"Error guardando el usuario: {e}"
-#
-#
+
+    def verificar_correo_existente(self, email):
+        """Verifica si un correo electrónico ya existe en la tabla 'Usuarios'."""
+        try:
+            conn = self.obtener_conexion()
+            cursor = conn.cursor()
+
+            # Verificar si el correo ya existe
+            sql = "SELECT COUNT(*) FROM Usuario WHERE Email = %s"
+            cursor.execute(sql, (email,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result[0] == 0
+
+        except mysql.connector.Error as e:
+            print(f"Error verificando el correo: {e}")
+            return False
+
+    def obtener_usuario_por_email(self, email):
+        """Obtiene un usuario de la base de datos por su email."""
+        try:
+            conn = self.obtener_conexion()
+            cursor = conn.cursor(dictionary=True)
+
+            sql = "SELECT * FROM Usuario WHERE Email = %s"
+            cursor.execute(sql, (email,))
+            user = cursor.fetchone()
+
+            cursor.close()
+            return user
+
+        except mysql.connector.Error as e:
+            print(f"Error al obtener el usuario: {e}")
+            return None
+
+    def obtener_lista_empleados(self):
+        """Obtiene la lista de correos electrónicos de los empleados de la base de datos."""
+        try:
+            conn = self.obtener_conexion()
+            cursor = conn.cursor(dictionary=True)
+
+            sql = "SELECT email FROM Usuario"
+            cursor.execute(sql)
+            correos = cursor.fetchall()
+
+            cursor.close()
+            return correos
+
+        except mysql.connector.Error as e:
+            print(f"Error al obtener la lista de correos electrónicos: {e}")
+            return []
+
+    def obtener_usuario_por_id(self, id):
+        try:
+            conn = self.obtener_conexion()
+            cursor = conn.cursor(dictionary=True)
+
+            sql = "SELECT * FROM Usuario WHERE id = %s"
+            cursor.execute(sql, (id,))
+            usuario = cursor.fetchone()
+
+            cursor.close()
+        except mysql.connector.Error as e:
+            print(f"Error al obtener el usuario: {e}")
+            return None
+        return usuario
+
+    def guardar_archivo(self, filename, file_data, user_id, hash_sha256, codigos_usuario):
+        try:
+            conn = self.obtener_conexion()
+            cursor = conn.cursor(dictionary=True)
+
+            sql = "INSERT INTO File (nombre_archivo, contenido_archivo, usuario_id, hash) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (filename, file_data, user_id, hash_sha256))
+            archivo_id = cursor.lastrowid
+
+            for usuario_id in codigos_usuario:
+                sql_firma = "INSERT INTO Firma (archivo_id, usuario_id, estado_firma) VALUES (%s, %s, %s)"
+                cursor.execute(sql_firma, (archivo_id, usuario_id, 0, ))
+
+            conn.commit()
+            cursor.close()
+
+        except mysql.connector.Error as e:
+            print(f"Error al obtener el usuario: {e}")
+            return None
+
+    def obtener_archivo_por_id(self, archivo_id):
+        # Conectar a la base de datos y ejecutar la consulta
+        conn = self.obtener_conexion()
+        cursor = conn.cursor(dictionary=True)
+
+        # Consultar el archivo por su ID
+        sql = "SELECT nombre_archivo, contenido_archivo FROM File WHERE id = %s"
+        cursor.execute(sql, (archivo_id,))
+
+        # Obtener el resultado
+        resultado = cursor.fetchone()
+        print(type(resultado))
+        cursor.close()
+        conn.close()
+
+        if resultado:
+            return {
+                "nombre_archivo": resultado["nombre_archivo"],
+                "contenido_archivo": resultado["contenido_archivo"]
+            }
+        else:
+            return None
+
 # # Ejemplo de uso
 # if __name__ == "__main__":
 #     bd = BaseDeDatos()
