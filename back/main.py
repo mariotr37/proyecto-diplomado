@@ -1,3 +1,4 @@
+import base64
 import datetime
 import hashlib
 import io
@@ -8,7 +9,11 @@ from flask import request, jsonify
 from flask import send_file
 from flask_cors import CORS
 from flask import Flask
-
+from flask import Flask, request, jsonify
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 from Bd import BaseDeDatos
 from RSAKeyGenerator import RSAKeyGenerator
 from Token_ import token_required
@@ -94,6 +99,16 @@ def lista_usuarios(current_user):
     return jsonify(result), 200
 
 
+@app.route('/lista_archivos_firmar', methods=['GET'])
+@token_required
+def lista_archivos_firmar(current_user):
+    bd = BaseDeDatos()
+    files = bd.obtener_archivos_por_usuario_y_estado(current_user['id'])
+
+
+    return jsonify(files), 200
+
+
 @app.route('/upload', methods=['POST'])
 @token_required
 def upload_file(current_user):
@@ -150,6 +165,45 @@ def descargar_archivo(current_user):
     )
 
 
+@app.route('/firmar_archivo', methods=['POST'])
+@token_required
+def firmar_archivo(current_user):
+    bd = BaseDeDatos()
+    hash_file = request.args.get('hash_file')
+
+    if 'privateKey' not in request.files:
+        return jsonify({'message': 'Se requiere el archivo .pem con la llave privada y el ID de usuario'}), 400
+
+        # Obtener la llave privada del archivo .pem y el usuario_id del formulario
+    private_key_pem = request.files['privateKey'].read().decode("utf-8")
+    private_key_pem = formatear_llave_privada(private_key_pem)
+    usuario_id = current_user['id']
+
+    # Obtener la llave pública desde la base de datos
+    result = bd.obtener_llave_publica(usuario_id)
+
+    if not result:
+        return jsonify({'message': 'No se encontró la llave pública para el usuario proporcionado'}), 404
+
+    try:
+        # Cargar las llaves
+        private_key = cargar_llave_privada(private_key_pem.encode('utf-8'))
+        public_key = cargar_llave_publica(result["PublicKey"])
+
+        firma = firmar_mensaje(private_key, hash_file.encode('utf-8'))
+        # Verificar la firma con la llave pública
+        if verificar_firma(public_key, hash_file.encode("utf-8"), firma):
+            print("ish")
+            bd = BaseDeDatos()
+            bd.actualizar_firma(usuario_id, hash_file, firma_a_base64(firma))
+            return jsonify({'message': 'Las llaves corresponden. La firma es válida.'})
+        else:
+            return jsonify({'message': 'Las llaves NO corresponden.'}), 400
+
+    except Exception as e:
+        return jsonify({'message': 'Error al procesar las llaves.', 'error': str(e)}), 500
+
+
 ###########################################################
 ###########################################################
 
@@ -165,6 +219,67 @@ def verificar_password_hash(password, hash_almacenado):
     # Verificar si la contraseña coincide con el hash almacenado
     return bcrypt.checkpw(password.encode('utf-8'), hash_almacenado)
 
+# Cargar la llave pública desde el texto plano
+def cargar_llave_publica(public_key_text):
+    return serialization.load_pem_public_key(
+        public_key_text.encode('utf-8'),  # Convertir texto plano a bytes
+        backend=default_backend()
+    )
+
+# Cargar la llave privada desde el archivo .pem
+def cargar_llave_privada(private_key_pem):
+    return serialization.load_pem_private_key(
+        private_key_pem,
+        password=None,  # Si la clave tiene contraseña, manejarla aquí
+        backend=default_backend()
+    )
+
+# Verificar la firma usando la llave pública
+def verificar_firma(public_key, mensaje, firma):
+    try:
+        public_key.verify(
+            firma,
+            mensaje,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        return True
+    except Exception as e:
+        print(f"Error al verificar: {e}")
+        return False
+
+# Convertir la firma (bytes) a una cadena en Base64
+def firma_a_base64(firma):
+    return base64.b64encode(firma).decode('utf-8')
+
+# Convertir de Base64 a bytes (cuando necesites verificar la firma)
+def base64_a_firma(firma_base64):
+    return base64.b64decode(firma_base64)
+
+def formatear_llave_privada(private_key_string):
+    # Eliminar cualquier espacio o salto de línea innecesario
+    private_key_string = private_key_string.replace('\\n', '').replace('\n', '').strip()
+    private_key_string = private_key_string.replace('-----BEGIN RSA PRIVATE KEY-----', '').replace('-----END RSA PRIVATE KEY-----', '').strip()
+
+    # Reinsertar los saltos de línea cada 64 caracteres
+    formatted_key = "-----BEGIN RSA PRIVATE KEY-----\n"
+    for i in range(0, len(private_key_string), 64):
+        formatted_key += private_key_string[i:i + 64] + '\n'
+    formatted_key += "-----END RSA PRIVATE KEY-----\n"
+
+    return formatted_key
+# Firmar un mensaje simple con la llave privada
+def firmar_mensaje(private_key, mensaje):
+    try:
+        firma = private_key.sign(
+            mensaje,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+    except Exception as e:
+        print(f"Error al verificar: {e}")
+
+    return firma
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

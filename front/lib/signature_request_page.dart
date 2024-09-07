@@ -1,8 +1,10 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
-import 'package:flutter_file_downloader/flutter_file_downloader.dart';
-import 'package:file_selector/file_selector.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
+import 'package:taller_1_diplomado/util.dart';
 
 class SignatureRequestPage extends StatefulWidget {
   const SignatureRequestPage({super.key});
@@ -12,88 +14,211 @@ class SignatureRequestPage extends StatefulWidget {
 }
 
 class _SignatureRequestPageState extends State<SignatureRequestPage> {
-  // Lista de solicitudes
-  final List<Map<String, dynamic>> requests = [
-    {
-      "userName": "JESSICA JOHANA",
-      "fileName": "COPIA.PDF",
-      "fileUrl": "https://www.example.com/copia.pdf"
-    },
-    {
-      "userName": "MARIO",
-      "fileName": "HOJA DE VIDA.DOCX",
-      "fileUrl": "https://www.example.com/hoja_de_vida.docx"
-    },
-  ];
-
-  // Variable para rastrear la selección de radio buttons
+  List<Map<String, dynamic>> requests = [];
+  bool _isLoading = false;
   int? _selectedRequestIndex;
+  PlatformFile? pemFile; // Variable para almacenar el archivo .pem seleccionado
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingRequests();
+  }
+
+  Future<void> _loadPendingRequests() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final token = await Util.getValue('token');
+      if (token == null) {
+        Util.showAlert(context, 'Error', 'Token no disponible');
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('http://localhost:5000/lista_archivos_firmar'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> responseData = jsonDecode(response.body);
+        setState(() {
+          requests = responseData
+              .map((item) =>
+                  {"fileName": item['fileName'], "fileHash": item['fileHash']})
+              .toList();
+        });
+      } else {
+        Util.showAlert(
+            context, 'Error', 'No se pudieron cargar las solicitudes');
+      }
+    } catch (e) {
+      Util.showAlert(context, 'Error', 'Error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _pickPemFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pem'],
+    );
+
+    if (result != null) {
+      setState(() {
+        pemFile = result.files.first; // Almacenar el archivo .pem seleccionado
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Archivo .pem seleccionado: ${pemFile!.name}'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se seleccionó ningún archivo .pem')),
+      );
+    }
+  }
+
+  Future<void> _signFile() async {
+    if (_selectedRequestIndex == null || pemFile == null) {
+      Util.showAlert(context, 'Error',
+          'Debe seleccionar un archivo y cargar la llave privada.');
+      return;
+    }
+
+    final selectedRequest = requests[_selectedRequestIndex!];
+    final fileName =
+        selectedRequest['fileName']; // Obtener el nombre del archivo
+    final fileHash = selectedRequest['fileHash'];
+
+    final token = await Util.getValue('token');
+    if (token == null) {
+      Util.showAlert(context, 'Error', 'Token no disponible.');
+      return;
+    }
+
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://localhost:5000/firmar_archivo?hash_file=$fileHash'),
+      );
+      request.headers.addAll({
+        "Authorization": "Bearer $token",
+      });
+
+      // Adjuntar el archivo .pem
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          pemFile!.bytes!,
+          filename: pemFile!.name,
+        ),
+      );
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final jsonResponse = jsonDecode(responseData);
+
+        final message = jsonResponse['message'];
+        Util.showAlert(context, 'Firma exitosa', message);
+
+        // Guardar el nombre del archivo firmado en SharedPreferences
+        List<String> signedFiles = [];
+        final savedFiles = await Util.getValue('signedFiles');
+        if (savedFiles != null) {
+          signedFiles = List<String>.from(jsonDecode(savedFiles));
+        }
+        signedFiles.add(fileName);
+
+        // Guardar la lista actualizada de archivos firmados
+        await Util.saveValue('signedFiles', jsonEncode(signedFiles));
+
+        // Limpiar después de firmar
+        setState(() {
+          _selectedRequestIndex = null;
+          pemFile = null;
+        });
+      } else {
+        Util.showAlert(context, 'Error', 'Error al firmar el archivo.');
+      }
+    } catch (e) {
+      Util.showAlert(context, 'Error', 'Error: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.purple[800],
-      body: Center(
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.65,
-          padding: const EdgeInsets.all(26.0),
-          margin: const EdgeInsets.all(46.0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.5),
-                spreadRadius: 5,
-                blurRadius: 7,
-                offset: const Offset(0, 3),
+    return Center(
+      child: _isLoading
+          ? const CircularProgressIndicator()
+          : Container(
+              width: MediaQuery.of(context).size.width * 0.5,
+              padding: const EdgeInsets.all(26.0),
+              margin: const EdgeInsets.all(70.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.5),
+                    spreadRadius: 5,
+                    blurRadius: 7,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Solicitud de firmas',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple[800],
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        'Solicitudes de firmas',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple[800],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildRequestTable(),
+                    const SizedBox(height: 30),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: _signFile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple[800]!,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 18, horizontal: 30),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Firmar archivo',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              _buildRequestTable(),
-              const SizedBox(height: 30),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _selectedRequestIndex != null
-                      ? () {
-                          _showUploadDialog();
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.purple[800],
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 16.0,
-                      horizontal: 32.0,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                  child: const Text(
-                    'Firmar archivo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -101,47 +226,45 @@ class _SignatureRequestPageState extends State<SignatureRequestPage> {
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(0.1),
-        1: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(0.5),
         2: FlexColumnWidth(0.4),
-        3: FlexColumnWidth(0.1),
       },
       border: TableBorder.all(
-        color: Colors.purple[800]!,
+        color: Colors.deepPurple[800]!,
         width: 1.5,
         borderRadius: BorderRadius.circular(5),
       ),
       children: [
-        const TableRow(
+        TableRow(
           decoration: BoxDecoration(
-            color: Color.fromARGB(255, 246, 212, 255),
+            color: Colors.deepPurple[50],
           ),
           children: [
-            SizedBox.shrink(),
+            const SizedBox.shrink(),
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Text(
-                'Nombre de usuario',
+                'NOMBRE DEL ARCHIVO',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.grey[700],
                 ),
               ),
             ),
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Text(
-                'Nombre archivo',
+                'CARGAR LLAVE PRIVADA',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.grey[700],
                 ),
               ),
             ),
-            SizedBox.shrink(),
           ],
         ),
         ...requests.asMap().entries.map((entry) {
@@ -149,7 +272,7 @@ class _SignatureRequestPageState extends State<SignatureRequestPage> {
           Map<String, dynamic> request = entry.value;
           return TableRow(
             decoration: BoxDecoration(
-              color: index.isEven ? Colors.white : Colors.purple[50],
+              color: index.isEven ? Colors.white : Colors.deepPurple[50],
             ),
             children: [
               Padding(
@@ -167,170 +290,22 @@ class _SignatureRequestPageState extends State<SignatureRequestPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                 child: Text(
-                  request['userName'],
+                  request['fileName'],
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12.0),
-                child: Text(
-                  request['fileName'],
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                child: ElevatedButton(
+                  onPressed: _pickPemFile,
+                  child: const Text('Cargar .pem'),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.download, color: Colors.purple),
-                onPressed: () {
-                  if (_selectedRequestIndex == null) {
-                    _showSelectionDialog();
-                  } else {
-                    _downloadFile(request['fileUrl'], request['fileName']);
-                  }
-                },
               ),
             ],
           );
         }),
       ],
-    );
-  }
-
-  // Método para descargar el archivo
-  void _downloadFile(String fileUrl, String fileName) async {
-    await FileDownloader.downloadFile(
-      url: fileUrl,
-      name: fileName,
-      onDownloadCompleted: (path) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Descarga completa: $fileName')),
-        );
-      },
-      onDownloadError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al descargar: $fileName')),
-        );
-      },
-    );
-  }
-
-  // Mostrar un diálogo si no se seleccionó ningún archivo
-  void _showSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Seleccionar archivo'),
-          content: const Text(
-              'Por favor, seleccione un archivo antes de continuar.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Mostrar el diálogo para subir un archivo
-  void _showUploadDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        XFile? localSelectedFile;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              scrollable: true,
-              title: const Text('Subir archivo para autenticar la firma'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton(
-                    onPressed: () async {
-                      const typeGroup = XTypeGroup(
-                        label: 'files',
-                      );
-                      final XFile? file =
-                          await openFile(acceptedTypeGroups: [typeGroup]);
-
-                      if (file != null) {
-                        setState(() {
-                          localSelectedFile = file;
-                        });
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Archivo seleccionado: ${file.name}'),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5), // Bordes rectos
-                      ),
-                    ),
-                    child: const Text('Seleccionar archivo'),
-                  ),
-                  const SizedBox(height: 10),
-                  if (localSelectedFile != null)
-                    Text(
-                      'Archivo seleccionado: ${localSelectedFile!.name}',
-                      style: const TextStyle(fontSize: 16),
-                      textAlign: TextAlign.center,
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Cerrar el diálogo
-                  },
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: localSelectedFile != null
-                      ? () {
-                          Navigator.of(context).pop();
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return AlertDialog(
-                                title: const Text('Éxito'),
-                                content:
-                                    const Text('Archivo firmado con éxito.'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                    },
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        }
-                      : null, // Deshabilitar si no hay archivo seleccionado
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5), // Bordes rectos
-                    ),
-                  ),
-                  child: const Text('Subir y firmar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }

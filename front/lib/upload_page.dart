@@ -16,6 +16,8 @@ class UploadPage extends StatefulWidget {
 class _UploadPageState extends State<UploadPage> {
   FileModel? selectedFile;
   List<UserModel> users = [];
+  PlatformFile? fileBytes;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -43,7 +45,7 @@ class _UploadPageState extends State<UploadPage> {
 
           setState(() {
             users = emails
-                .map((email) => UserModel(name: email, isChecked: false))
+                .map((email) => UserModel(email: email, isChecked: false))
                 .toList();
           });
         } else {
@@ -70,6 +72,7 @@ class _UploadPageState extends State<UploadPage> {
           completed: false,
           progress: 0.0,
         );
+        fileBytes = file;
       });
 
       simulateFileUpload(file.name);
@@ -87,6 +90,73 @@ class _UploadPageState extends State<UploadPage> {
             selectedFile!.completed = true;
           }
         }
+      });
+    }
+  }
+
+  Future<void> _submitRequest() async {
+    if (selectedFile == null || !selectedFile!.completed || fileBytes == null) {
+      Util.showAlert(context, 'Error', 'No se ha cargado ningún archivo.');
+      return;
+    }
+
+    final selectedUsers = users
+        .where((user) => user.isChecked)
+        .map((user) => user.email)
+        .toList();
+    if (selectedUsers.isEmpty) {
+      Util.showAlert(context, 'Error', 'No se ha seleccionado ningún usuario.');
+      return;
+    }
+
+    final token = await Util.getValue('token');
+    if (token == null) {
+      Util.showAlert(context, 'Error', 'Token no disponible.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(
+            'http://localhost:5000/upload?codigos_usuario=${selectedUsers.join(",")}'),
+      );
+      request.headers.addAll({
+        "Authorization": "Bearer $token",
+      });
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          fileBytes!.bytes!,
+          filename: fileBytes!.name,
+        ),
+      );
+
+      final response = await request.send();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        Util.showAlert(context, 'Éxito', 'Solicitud enviada correctamente.');
+
+        setState(() {
+          selectedFile = null;
+          fileBytes = null;
+          for (var user in users) {
+            user.isChecked = false;
+          }
+        });
+      } else {
+        Util.showAlert(context, 'Error', 'Error al enviar la solicitud.');
+      }
+    } catch (e) {
+      Util.showAlert(context, 'Error', 'Error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -132,24 +202,24 @@ class _UploadPageState extends State<UploadPage> {
               const SizedBox(height: 20),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 150),
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Implementar función de enviar
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple[800]!,
-                    minimumSize: const Size(double.infinity, 50),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 18, horizontal: 30),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Realizar solicitud',
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                ),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _submitRequest,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple[800]!,
+                          minimumSize: const Size(double.infinity, 50),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 18, horizontal: 30),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Realizar solicitud',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      ),
               ),
               const SizedBox(height: 10),
             ],
@@ -257,10 +327,10 @@ class UploadButton extends StatelessWidget {
 }
 
 class UserModel {
-  String name;
+  String email;
   bool isChecked;
 
-  UserModel({required this.name, this.isChecked = false});
+  UserModel({required this.email, this.isChecked = false});
 }
 
 class UserSelection extends StatefulWidget {
@@ -301,7 +371,7 @@ class _UserSelectionState extends State<UserSelection> {
               itemBuilder: (context, index) {
                 return CheckboxListTile(
                   title: Text(
-                    widget.users[index].name,
+                    widget.users[index].email,
                     style: TextStyle(color: Colors.grey[700]),
                   ),
                   value: widget.users[index].isChecked,

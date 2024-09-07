@@ -28,9 +28,13 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Subir Archivos',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          _selectedIndex == 0
+              ? "Subir Archivos"
+              : _selectedIndex == 1
+                  ? "Solicitudes de firmas"
+                  : "Mi Perfil",
+          style: const TextStyle(color: Colors.white),
         ),
         leading: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 0, 8),

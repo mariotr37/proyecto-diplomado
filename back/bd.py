@@ -184,9 +184,97 @@ class BaseDeDatos:
         else:
             return None
 
-# # Ejemplo de uso
-# if __name__ == "__main__":
-#     bd = BaseDeDatos()
-#     bd.guardar_usuario("juan", "key")
-#     bd.cerrar_conexion()
-#     # Realizar operaciones con la base de datos...
+
+    def obtener_archivos_por_usuario_y_estado(self, usuario_id):
+        # Conectar a la base de datos y ejecutar la consulta
+        conn = self.obtener_conexion()
+        cursor = conn.cursor(dictionary=True)
+
+        # Consulta para obtener los archivos según el usuario_id y estado_firma = 0
+        sql = """
+            SELECT fi.nombre_archivo, fi.hash
+            FROM Firma f
+            JOIN File fi ON f.archivo_id = fi.id
+            WHERE f.usuario_id = %s
+            AND f.estado_firma = 0
+        """
+        cursor.execute(sql, (usuario_id,))
+
+        # Obtener todos los resultados
+        resultados = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        if resultados:
+            return resultados  # Devuelve una lista de archivos
+        else:
+            return None
+
+    def obtener_llave_publica(self, usuario_id):
+        conn = self.obtener_conexion()
+        cursor = conn.cursor(dictionary=True)
+
+        # Consulta para obtener los archivos según el usuario_id y estado_firma = 0
+        sql = """
+                    SELECT PublicKey
+                    FROM Usuario
+                    WHERE id = %s
+                """
+        cursor.execute(sql, (usuario_id,))
+
+        # Obtener todos los resultados
+        resultados = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if resultados:
+            return resultados  # Devuelve una lista de archivos
+        else:
+            return None
+
+    def actualizar_firma(self, usuario_id, hash_file, firma):
+        print("Iniciando actualización de firma")
+
+        # Obtener conexión
+        conn = self.obtener_conexion()
+        if conn is None:
+            print("No se pudo establecer conexión con la base de datos")
+            return
+
+        print("Conexión establecida con éxito")
+        # Verificar si la conexión sigue activa
+        if not conn.is_connected():
+            print("La conexión a MySQL se ha perdido")
+            return
+        try:
+            cursor = conn.cursor(dictionary=True)
+            print("Cursor creado correctamente")
+
+            # Consulta SQL para actualizar la firma
+            sql = """
+            UPDATE Firma f
+            JOIN File fi ON f.archivo_id = fi.id
+            SET f.firma = %s, 
+                f.fecha_firma = NOW(),
+                f.estado_firma = 1
+            WHERE fi.hash = %s
+            AND f.usuario_id = %s;
+            """
+
+            # Ejecutar la consulta con los valores proporcionados
+            cursor.execute(sql, (firma, hash_file, usuario_id))
+            print("Consulta ejecutada correctamente")
+
+            # Confirmar la transacción
+            conn.commit()
+            print("Transacción confirmada. Firma actualizada.")
+
+        except mysql.connector.Error as e:
+            print(f"Error al actualizar la firma: {e}")
+
+        finally:
+            # Cerrar el cursor y la conexión si están abiertos
+            if conn.is_connected():
+                cursor.close()
+                conn.close()
+                print("Conexión cerrada correctamente")

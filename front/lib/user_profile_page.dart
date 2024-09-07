@@ -1,159 +1,194 @@
 import 'package:flutter/material.dart';
+import 'package:taller_1_diplomado/util.dart';
+import 'dart:convert';
 
-class UserProfilePage extends StatelessWidget {
+class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<String> signedDocuments = [
-      'Contrato_2023.pdf',
-      'Reporte_de_gastos.pdf',
-      'Planificación.docx'
-    ];
+  State<UserProfilePage> createState() => _UserProfilePageState();
+}
 
-    return Scaffold(
-      body: Padding(
+class _UserProfilePageState extends State<UserProfilePage> {
+  String? name;
+  String? phone;
+  String? email;
+  List<String> signedDocuments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _loadSignedDocuments();
+  }
+
+  Future<void> _loadUserData() async {
+    final loadedName = await Util.getValue('name');
+    final loadedPhone = await Util.getValue('phone');
+    final loadedEmail = await Util.getValue('email');
+
+    setState(() {
+      name = loadedName ?? 'No disponible';
+      phone = loadedPhone ?? 'No disponible';
+      email = loadedEmail ?? 'No disponible';
+    });
+  }
+
+  Future<void> _loadSignedDocuments() async {
+    final savedFiles = await Util.getValue('signedFiles');
+    if (savedFiles != null) {
+      setState(() {
+        signedDocuments = List<String>.from(jsonDecode(savedFiles));
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: MediaQuery.of(context).size.width * 0.45,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 20),
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.purple[200],
-                    child: const Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Perfil de usuario',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.purple[800],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          UserInfoField(
-                            icon: Icons.person,
-                            label: 'Nombre',
-                            value: 'Jessica Johana',
-                          ),
-                          Divider(),
-                          UserInfoField(
-                            icon: Icons.person_outline,
-                            label: 'Apellidos',
-                            value: 'Ospina',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          UserInfoField(
-                            icon: Icons.phone,
-                            label: 'Teléfono',
-                            value: '555-555-555',
-                          ),
-                          Divider(),
-                          UserInfoField(
-                            icon: Icons.email,
-                            label: 'Email',
-                            value: 'Jess@gmail.com',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 20),
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.deepPurple[800],
+              child: const Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(width: 20),
-            SizedBox(
-              width: MediaQuery.of(context).size.width * 0.25,
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Documentos firmados',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.purple[800],
+            const SizedBox(height: 15),
+            Text(
+              'Perfil de usuario',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple[800],
+              ),
+            ),
+            const SizedBox(height: 30),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            UserInfoField(
+                              icon: Icons.person,
+                              label: 'Nombre',
+                              value: name ?? 'No disponible',
+                            ),
+                          ],
                         ),
                       ),
-                      const Divider(),
-                      Expanded(
-                        child: signedDocuments.isNotEmpty
-                            ? ListView.builder(
-                                itemCount: signedDocuments.length,
-                                itemBuilder: (context, index) {
-                                  return ListTile(
-                                    leading: Icon(Icons.description,
-                                        color: Colors.purple[800]),
-                                    title: Text(signedDocuments[index]),
-                                  );
-                                },
-                              )
-                            : Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      size: 40,
-                                      color: Colors.grey[600],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'No hay documentos firmados',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                    ),
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                    ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            UserInfoField(
+                              icon: Icons.phone,
+                              label: 'Teléfono',
+                              value: phone ?? 'No disponible',
+                            ),
+                            const Divider(),
+                            UserInfoField(
+                              icon: Icons.email,
+                              label: 'Email',
+                              value: email ?? 'No disponible',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 20),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.25,
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Text(
+                              'Documentos firmados',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple[800],
+                              ),
+                            ),
+                          ),
+                          const Divider(),
+                          Expanded(
+                            child: signedDocuments.isNotEmpty
+                                ? ListView.builder(
+                                    itemCount: signedDocuments.length,
+                                    itemBuilder: (context, index) {
+                                      return ListTile(
+                                        leading: Icon(Icons.description,
+                                            color: Colors.deepPurple[800]),
+                                        title: Text(signedDocuments[index]),
+                                      );
+                                    },
+                                  )
+                                : Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          size: 40,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          'No hay documentos firmados',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -180,7 +215,7 @@ class UserInfoField extends StatelessWidget {
       children: [
         Icon(
           icon,
-          color: Colors.purple[800],
+          color: Colors.deepPurple[800],
         ),
         const SizedBox(width: 15),
         Column(
@@ -194,13 +229,13 @@ class UserInfoField extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 3),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: Colors.grey[800],
               ),
             ),
           ],
