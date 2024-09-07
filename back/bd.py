@@ -133,7 +133,7 @@ class BaseDeDatos:
             return None
         return usuario
 
-    def guardar_archivo(self, filename, file_data, user_id, hash_sha256, codigos_usuario):
+    def guardar_archivo(self, filename, file_data, user_id, hash_sha256, correos_usuario):
         try:
             conn = self.obtener_conexion()
             cursor = conn.cursor(dictionary=True)
@@ -142,9 +142,17 @@ class BaseDeDatos:
             cursor.execute(sql, (filename, file_data, user_id, hash_sha256))
             archivo_id = cursor.lastrowid
 
-            for usuario_id in codigos_usuario:
-                sql_firma = "INSERT INTO Firma (archivo_id, usuario_id, estado_firma) VALUES (%s, %s, %s)"
-                cursor.execute(sql_firma, (archivo_id, usuario_id, 0, ))
+            for correo_user in correos_usuario:
+                sql_usuario = "SELECT id FROM Usuario WHERE email = %s"
+                cursor.execute(sql_usuario, (correo_user,))
+                result = cursor.fetchone()  # Obtiene el primer resultado
+
+                if result:
+                    usuario_id = result['id']  # Asume que 'usuario_id' es la primera columna en el resultado
+
+                    # 2. Realizar la inserción en la tabla Firma
+                    sql_firma = "INSERT INTO Firma (archivo_id, usuario_id, estado_firma) VALUES (%s, %s, %s)"
+                    cursor.execute(sql_firma, (archivo_id, usuario_id, 0))
 
             conn.commit()
             cursor.close()

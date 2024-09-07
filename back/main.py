@@ -4,18 +4,18 @@ import io
 
 import bcrypt
 import jwt
-from flask import Flask, send_file
 from flask import request, jsonify
+from flask import send_file
 from flask_cors import CORS
+from flask import Flask
 
-from RSAKeyGenerator import RSAKeyGenerator
 from Bd import BaseDeDatos
+from RSAKeyGenerator import RSAKeyGenerator
 from Token_ import token_required
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:8080"]}})
 app.config['SECRET_KEY'] = 'test'
-
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -51,6 +51,7 @@ def register():
 
     return jsonify(response), 201
 
+
 @app.route('/inicio_sesion', methods=['POST'])
 def login():
     data = request.get_json()
@@ -63,13 +64,15 @@ def login():
         return jsonify({"error": "Llene todos los campos"}), 400
 
     # Verificar si el usuario existe en la base de datos
+    print(f"Correo a buscar {email}")
     user = bd.obtener_usuario_por_email(email)
+    print(user)
     if not user:
-        return jsonify({"error": "Correo o contraseña incorrectos"}), 401
+        return jsonify({"error": "Correo o contraseña incorrectos 1"}), 401
 
     # Verificar la contraseña
     if not verificar_password_hash(password, user['Password'].encode('utf-8')):
-        return jsonify({"error": "Correo o contraseña incorrectos"}), 401
+        return jsonify({"error": "Correo o contraseña incorrectos 2"}), 401
 
     token = jwt.encode({
         'user_id': user['id'],
@@ -78,13 +81,18 @@ def login():
 
     return jsonify({'token': token, 'message': 'Inicio de sesión exitoso'}), 200
 
+
 @app.route('/lista_usuarios', methods=['GET'])
 @token_required
 def lista_usuarios(current_user):
     bd = BaseDeDatos()
     usuarios = bd.obtener_lista_empleados()
 
-    return jsonify(usuarios), 200
+    emails_str = ','.join([email['email'] for email in usuarios])
+    result = {'email': emails_str}
+
+    return jsonify(result), 200
+
 
 @app.route('/upload', methods=['POST'])
 @token_required
@@ -97,8 +105,8 @@ def upload_file(current_user):
     codigos_usuario_str = request.args.get('codigos_usuario')
     if not codigos_usuario_str:
         return jsonify({"error": "No se ha enviado ningún código de usuario"}), 400
-    codigos_usuario = codigos_usuario_str.split(',')
-    codigos_usuario = [codigo.strip() for codigo in codigos_usuario]  # Limpiar espacios
+    correos_usuario = codigos_usuario_str.split(',')
+    correos_usuario = [codigo.strip() for codigo in correos_usuario]  # Limpiar espacios
 
     file = request.files['file']
 
@@ -110,9 +118,11 @@ def upload_file(current_user):
     file_data = file.read()
     hash_sha256 = hashlib.sha256(file_data).hexdigest()
 
-    bd.guardar_archivo(file.filename, file_data, current_user['id'], hash_sha256, codigos_usuario)
+    bd.guardar_archivo(file.filename, file_data, current_user['id'], hash_sha256, correos_usuario)
 
     return jsonify({"message": "Archivo recibido exitosamente", "filename": file.filename}), 200
+
+
 
 @app.route('/download', methods=['GET'])
 @token_required
@@ -138,6 +148,8 @@ def descargar_archivo(current_user):
         as_attachment=True,
         download_name=archivo['nombre_archivo']  # Nombre del archivo a descargar
     )
+
+
 ###########################################################
 ###########################################################
 

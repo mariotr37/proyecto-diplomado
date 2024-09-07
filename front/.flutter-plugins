@@ -1,4 +1,6 @@
 # This is a generated file; do not edit or check into version control.
+desktop_drop=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\desktop_drop-0.4.4\\
+file_picker=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_picker-8.0.5\\
 file_selector=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_selector-0.9.5\\
 file_selector_android=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_selector_android-0.5.1+2\\
 file_selector_ios=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_selector_ios-0.5.3\\
@@ -7,6 +9,7 @@ file_selector_macos=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.de
 file_selector_web=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_selector_web-0.9.4+2\\
 file_selector_windows=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\file_selector_windows-0.9.3+2\\
 flutter_file_downloader=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_file_downloader-2.0.0\\
+flutter_plugin_android_lifecycle=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_plugin_android_lifecycle-2.0.19\\
 path_provider_linux=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_linux-2.2.1\\
 path_provider_windows=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_windows-2.3.0\\
 shared_preferences=C:\\Users\\mario\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences-2.2.3\\

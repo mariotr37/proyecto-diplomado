@@ -1,8 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:taller_1_diplomado/login_page.dart';
 import 'package:taller_1_diplomado/signature_request_page.dart';
 import 'package:taller_1_diplomado/upload_page.dart';
 import 'package:taller_1_diplomado/user_profile_page.dart';
+import 'package:taller_1_diplomado/util.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -12,9 +15,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0; // Variable para rastrear la página seleccionada
+  int _selectedIndex = 0;
 
-  // Lista de las páginas que se pueden mostrar
   final List<Widget> _pages = [
     const UploadPage(),
     const SignatureRequestPage(),
@@ -24,15 +26,40 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          'Firmas digitales',
+          'Subir Archivos',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: Colors.purple[800],
+        leading: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 0, 8),
+          child: Container(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+            child: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(
+                    Icons.menu_rounded,
+                    color: Colors.deepPurple[800],
+                    size: 20,
+                  ),
+                  highlightColor: Colors.transparent,
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer();
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        backgroundColor: Colors.deepPurple[800],
       ),
       drawer: _buildDrawer(context),
-      body: _pages[_selectedIndex], // Mostrar la página seleccionada
+      body: _pages[_selectedIndex],
     );
   }
 
@@ -43,55 +70,69 @@ class _HomePageState extends State<HomePage> {
         children: [
           Container(
             alignment: Alignment.centerLeft,
-            height: 80,
+            height: 60,
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.purple[800],
+              color: Colors.deepPurple[800],
             ),
             child: const Text(
               'Menú',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SizedBox(height: 50),
-                _buildDrawerItem(
-                  icon: Icons.upload_file,
-                  text: 'Upload Page',
-                  index: 0, // Índice correspondiente a la página UploadPage
+                Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildDrawerItem(
+                      icon: Icons.upload_file_rounded,
+                      text: 'Subir Archivos',
+                      index: 0,
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.edit_document,
+                      text: 'Solicitudes de Firmas',
+                      index: 1,
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.person,
+                      text: 'Mi Perfil',
+                      index: 2,
+                    ),
+                  ],
                 ),
-                _buildDrawerItem(
-                  icon: Icons.request_page,
-                  text: 'Signature Request Page',
-                  index:
-                      1, // Índice correspondiente a la página SignatureRequestPage
-                ),
-                _buildDrawerItem(
-                  icon: Icons.person,
-                  text: 'User Profile',
-                  index:
-                      2, // Índice correspondiente a la página UserProfilePage
-                ),
-                SizedBox(height: MediaQuery.of(context).size.height * 0.55),
-                const Divider(),
-                ListTile(
-                  title: const Text('Cerrar sesión'),
-                  leading: const Icon(Icons.logout),
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginPage()),
-                    );
-                  },
+                Column(
+                  children: [
+                    ListTile(
+                        title: Text(
+                          'Cerrar sesión',
+                          style: TextStyle(color: Colors.redAccent[700]),
+                        ),
+                        leading: Icon(
+                          Icons.logout_outlined,
+                          color: Colors.redAccent[700],
+                          size: 20,
+                        ),
+                        onTap: () async {
+                          await Util.removeValue('token');
+
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
+                            (Route<dynamic> route) => false,
+                          );
+                        }),
+                    const SizedBox(height: 10),
+                  ],
                 ),
               ],
             ),
@@ -107,13 +148,20 @@ class _HomePageState extends State<HomePage> {
     required int index,
   }) {
     return ListTile(
-      title: Text(text),
-      leading: Icon(icon),
+      title: Text(
+        text,
+        style: TextStyle(color: Colors.grey[700]),
+      ),
+      leading: Icon(
+        icon,
+        color: Colors.deepPurple[800],
+        size: 20,
+      ),
       onTap: () {
         setState(() {
-          _selectedIndex = index; // Actualizar el índice seleccionado
+          _selectedIndex = index;
         });
-        Navigator.pop(context); // Cerrar el Drawer después de seleccionar
+        Navigator.pop(context);
       },
     );
   }
